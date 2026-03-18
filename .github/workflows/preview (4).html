@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Glow Clock Pro MAX+</title>
+
+<style>
+body{
+  margin:0;font-family:Arial;text-align:center;
+  background:#0a0f1f;color:white;
+  display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;overflow:hidden;
+}
+
+/* Background */
+.bg{
+  position:fixed;width:100%;height:100%;
+  background:repeating-radial-gradient(circle,#00f7ff22 0 2px,transparent 3px 120px);
+  animation:move 20s linear infinite;z-index:-1;
+}
+@keyframes move{to{transform:translate(-200px,-200px)}}
+
+/* UI */
+h1{color:#00f7ff;text-shadow:0 0 20px #00f7ff}
+.tabs button{
+  margin:5px;padding:10px;border-radius:12px;border:none;
+  background:linear-gradient(145deg,#00f7ff,#00c3cc);
+  box-shadow:0 5px 0 #008c94;cursor:pointer;
+}
+.tabs button:active{transform:translateY(3px)}
+
+.section{display:none;width:340px;max-width:90%}
+.active{display:block}
+
+.box{
+  margin-top:20px;padding:20px;border-radius:18px;
+  border:2px solid #00f7ff;
+  box-shadow:0 0 30px #00f7ff;
+  background:rgba(10,15,31,0.7);
+}
+
+/* Buttons */
+.action{
+  margin:5px;padding:12px;border:none;border-radius:14px;
+  background:linear-gradient(145deg,#00f7ff,#00c3cc);
+  box-shadow:0 8px 0 #008c94;cursor:pointer;
+}
+.action:active{transform:translateY(5px)}
+
+.time{font-size:24px;margin-top:10px}
+
+/* Light Mode */
+.light{background:#f0f0f0;color:black}
+</style>
+</head>
+
+<body>
+
+<div class="bg"></div>
+
+<h1>✨ Glow Clock Pro MAX+</h1>
+
+<div class="tabs">
+  <button onclick="tab('alarm')">Alarm</button>
+  <button onclick="tab('timer')">Timer</button>
+  <button onclick="tab('sw')">Stopwatch</button>
+  <button onclick="tab('world')">World</button>
+  <button onclick="mode()">Mode</button>
+</div>
+
+<!-- Alarm -->
+<div id="alarm" class="section active box">
+  <h2>⏰ Alarm</h2>
+  <input type="time" id="alarmInput">
+  <button class="action" onclick="setAlarm()">Set</button>
+  <p id="alarmText"></p>
+</div>
+
+<!-- Timer -->
+<div id="timer" class="section box">
+  <h2>⏳ Timer</h2>
+  <input id="m" type="number" placeholder="Min">
+  <input id="s" type="number" placeholder="Sec"><br>
+  <button class="action" onclick="startT()">Start</button>
+  <button class="action" onclick="pauseT()">Pause</button>
+  <button class="action" onclick="resetT()">Reset</button>
+  <div id="t" class="time">00:00</div>
+</div>
+
+<!-- Stopwatch -->
+<div id="sw" class="section box">
+  <h2>⏱️ Stopwatch</h2>
+  <div id="swTime" class="time">00:00:00</div>
+  <button class="action" onclick="startSW()">Start</button>
+  <button class="action" onclick="stopSW()">Stop</button>
+  <button class="action" onclick="resetSW()">Reset</button>
+</div>
+
+<!-- World -->
+<div id="world" class="section box">
+  <h2>🌍 World Clock</h2>
+  <select id="zones">
+    <option value="Africa/Cairo">Cairo</option>
+    <option value="Europe/London">London</option>
+    <option value="Asia/Tokyo">Tokyo</option>
+    <option value="America/New_York">New York</option>
+    <option value="Asia/Dubai">Dubai</option>
+  </select>
+  <button class="action" onclick="addCity()">Add</button>
+  <div id="list"></div>
+</div>
+
+<script>
+// Tabs
+function tab(id){
+  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// Mode
+function mode(){document.body.classList.toggle("light")}
+
+// Sound (Fast)
+const click=new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg");
+click.volume=0.3;
+document.querySelectorAll("button").forEach(b=>{
+  b.addEventListener("click",()=>{click.currentTime=0;click.play();});
+});
+
+// Notification
+Notification.requestPermission();
+
+// Alarm
+let alarm=localStorage.getItem("alarm")||null;
+if(alarm) alarmText.innerText="Saved: "+alarm;
+
+function setAlarm(){
+  alarm=alarmInput.value;
+  if(!alarm){alarmText.innerText="⚠ choose time";return;}
+  localStorage.setItem("alarm",alarm);
+  alarmText.innerText="✅ Set for "+alarm;
+}
+
+setInterval(()=>{
+  let now=new Date().toTimeString().slice(0,5);
+  if(now===alarm){
+    new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg").play();
+    if(Notification.permission==="granted") new Notification("Alarm!");
+    alarm=null;
+    localStorage.removeItem("alarm");
+  }
+},1000);
+
+// Timer
+let total=parseInt(localStorage.getItem("timer"))||0;
+let ti,run=false;
+
+function drawT(){
+  t.innerText=String(Math.floor(total/60)).padStart(2,'0')+":"+String(total%60).padStart(2,'0');
+}
+drawT();
+
+function startT(){
+  if(run) return;
+  if(total===0) total=(+m.value||0)*60+(+s.value||0);
+  run=true;
+  ti=setInterval(()=>{
+    total--;drawT();
+    localStorage.setItem("timer",total);
+    if(total<=0){
+      clearInterval(ti);run=false;
+      new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play();
+    }
+  },1000);
+}
+function pauseT(){clearInterval(ti);run=false;}
+function resetT(){clearInterval(ti);run=false;total=0;drawT();localStorage.removeItem("timer");}
+
+// Stopwatch
+let sw=0,si,start;
+function startSW(){
+  start=Date.now()-sw*1000;
+  si=setInterval(()=>{
+    sw=Math.floor((Date.now()-start)/1000);
+    swTime.innerText=
+      String(Math.floor(sw/3600)).padStart(2,'0')+":"+
+      String(Math.floor(sw%3600/60)).padStart(2,'0')+":"+
+      String(sw%60).padStart(2,'0');
+  },100);
+}
+function stopSW(){clearInterval(si);}
+function resetSW(){sw=0;swTime.innerText="00:00:00";}
+
+// World Clock
+let cities=JSON.parse(localStorage.getItem("cities")||"[]");
+
+function addCity(){
+  let z=zones.value;
+  if(cities.includes(z)) return;
+  cities.push(z);
+  localStorage.setItem("cities",JSON.stringify(cities));
+  render();
+}
+function removeCity(z){
+  cities=cities.filter(c=>c!==z);
+  localStorage.setItem("cities",JSON.stringify(cities));
+  render();
+}
+function render(){
+  list.innerHTML="";
+  cities.forEach(z=>{
+    let d=document.createElement("div");
+    d.className="time";
+    d.innerHTML=`${z} <span></span> <button onclick="removeCity('${z}')">❌</button>`;
+    list.appendChild(d);
+  });
+}
+setInterval(()=>{
+  document.querySelectorAll("#list div").forEach((el,i)=>{
+    el.querySelector("span").innerText=
+      new Date().toLocaleTimeString("en-US",{timeZone:cities[i]});
+  });
+},1000);
+
+render();
+
+// Mouse 3D
+document.addEventListener("mousemove",e=>{
+  let x=(e.clientX/window.innerWidth-0.5)*10;
+  let y=(e.clientY/window.innerHeight-0.5)*10;
+  document.body.style.transform=`rotateX(${-y}deg) rotateY(${x}deg)`;
+});
+</script>
+
+</body>
+</html>
